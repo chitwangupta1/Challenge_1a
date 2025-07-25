@@ -20,6 +20,43 @@ This project extracts structured headings (`H1`, `H2`, `H3`) from PDF files usin
 
 ---
 
+## 🛠 Project Structure & Key Functions
+
+### 📂 `extract_headings.py`
+
+#### `extract_font_sizes(doc)`
+- Counts unique font sizes across the PDF using `fitz`.
+- Filters based on frequency to identify top heading sizes.
+
+#### `is_valid_heading(text)`
+- Rejects:
+  - Common noise (e.g. "Table", "Fig", "Page 1", etc.)
+  - Very short or overly long lines
+  - Lines starting with codes or symbols
+- Keeps:
+  - Well-capitalized
+  - Balanced punctuation
+  - Starts with uppercase
+  - Left-aligned (likely heading)
+
+#### `get_tables_on_page(page)`
+- Uses `pdfplumber` to extract table bounding boxes.
+- Returns list of table regions to ignore heading-like text inside them.
+
+#### `is_inside_table(bbox, table_bboxes)`
+- Checks if a text box overlaps any detected table region.
+
+#### `extract_headings_from_pdf(pdf_path)`
+1. Loads both `fitz` and `pdfplumber` for dual processing.
+2. Detects candidate font sizes from all text spans.
+3. Loops through each page:
+   - Skips text that overlaps with tables.
+   - Applies heuristics (size, position, boldness, punctuation).
+   - Assigns heading level (`H1`, `H2`, `H3`) based on font size ranks.
+4. Stores result in structured JSON.
+
+---
+
 ## 📦 Installation
 
 ### 🔧 Local Setup
