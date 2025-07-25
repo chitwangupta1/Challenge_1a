@@ -1,0 +1,3 @@
+PyMuPDF==1.23.9
+pdfplumber==0.10.3
+spacy==3.7.2
