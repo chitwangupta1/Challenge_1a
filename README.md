@@ -1,166 +1,148 @@
-🧠 PDF Heading Extractor – Functional Breakdown
-This project is designed to extract meaningful hierarchical headings (H1, H2, H3) from a PDF document by combining font analysis, text heuristics, and layout intelligence using tools like PyMuPDF and pdfplumber.
+Here is a complete, single `README.md` file for your **PDF Heading Extractor** project, formatted for GitHub and with all functions and logic described, along with Docker usage instructions:
 
-⚙️ Core Libraries Used
-fitz from PyMuPDF: For reading PDF files and accessing detailed layout information like font size, boldness, etc.
+---
 
-pdfplumber: For detecting and excluding tables from consideration.
+````markdown
+# 🧠 PDF Heading Extractor
 
-re: For applying regex-based text filtering (e.g., removing captions, ignoring page headers).
+This project extracts structured headings (`H1`, `H2`, `H3`) from PDF files using font size, boldness, punctuation, layout, and position-based heuristics. It intelligently avoids table content and noisy text using a combination of visual and textual filters.
 
-Counter: To identify most common font sizes for heading detection.
+---
 
-(Optional) spacy: For advanced NLP tasks (e.g., sentence detection, entity recognition — if needed).
+## 🚀 Features
 
-🔍 Main Functions and Their Roles
-### extract_font_statistics(doc)
-Purpose:
-Analyze all text spans in the PDF to collect font sizes and frequency counts to determine the most commonly used sizes.
+- ✅ Font size–based heading classification
+- ✅ Bold and uppercase text emphasis
+- ✅ Table-aware filtering using `pdfplumber`
+- ✅ Page layout and alignment checks
+- ✅ Noise filtering for common patterns
+- ✅ Structured JSON output with heading level, page number, and text
 
-Approach:
+---
 
-Iterates through each page, each block, and each span to collect font sizes.
+## 📦 Installation
 
-Uses Counter to count font size frequencies.
+### 🔧 Local Setup
 
-Helps in determining which font sizes likely represent headings versus body text.
+1. Clone the repo:
 
-python
-Copy
-Edit
-font_counter = Counter()
-for page in doc:
-    for block in page.get_text("dict")["blocks"]:
-        for line in block.get("lines", []):
-            for span in line.get("spans", []):
-                font_counter[round(span["size"], 1)] += 1
-### detect_heading_levels(font_counter)
-Purpose:
-Assign H1, H2, H3 levels based on the top N font sizes.
+   ```bash
+   git clone https://github.com/your-username/pdf-heading-extractor.git
+   cd pdf-heading-extractor
+````
 
-Approach:
+2. Install dependencies:
 
-Sort font sizes by size (not frequency) in descending order.
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-Map the largest size to H1, second to H2, third to H3.
+3. Run the script:
 
-python
-Copy
-Edit
-top_fonts = sorted(font_counter.keys(), reverse=True)
-heading_levels = {top_fonts[0]: "H1", top_fonts[1]: "H2", top_fonts[2]: "H3"}
-### get_table_bounding_boxes(pdfplumber_page)
-Purpose:
-Detect and return bounding boxes of tables to avoid extracting headings inside tables.
+   ```bash
+   python main.py --pdf_path path/to/file.pdf
+   ```
 
-Approach:
+---
 
-Use pdfplumber's extract_tables() method.
+### 🐳 Docker Setup
 
-Each table is stored as a rectangular box (x0, y0, x1, y1).
+1. **Build Docker image**
 
-All text inside these boxes is excluded from heading detection.
+   ```bash
+   docker build -t pdf-heading-extractor .
+   ```
 
-### is_invalid_text(text)
-Purpose:
-Reject spans that are clearly not headings, such as captions, tables, codes, etc.
+2. **Run PDF extractor inside Docker**
 
-Heuristics Used:
+   ```bash
+   docker run -it --rm -v "${PWD}:/app" pdf-heading-extractor --pdf_path sample.pdf
+   ```
 
-Reject if starts with "Figure", "Table", "Fig", etc.
+---
 
-Reject short lines (e.g., 1-2 words).
+## 🧩 Core Logic and Function Descriptions
 
-Reject lines in all lowercase or overly numeric.
+### `extract_headings_from_pdf(pdf_path)`
 
-Reject if contains too much punctuation or looks like metadata.
+* **Purpose:** Main function that orchestrates extraction using both `fitz` and `pdfplumber`.
+* **Steps:**
 
-python
-Copy
-Edit
-if re.match(r'^(Figure|Table|Fig)\b', text): return True
-if len(text.split()) <= 2: return True
-if text.islower(): return True
-### is_inside_table(span_bbox, table_bboxes)
-Purpose:
-Given a text span and a list of table bounding boxes, determine if the span is within any table.
+  * Loads each page using `fitz` to get text spans and font sizes.
+  * Cross-references table boundaries from `pdfplumber`.
+  * Applies multiple heading filters and classification heuristics.
 
-Approach:
+---
 
-Use bounding box overlap logic.
+### `is_heading_like(text: str)`
 
-If span_bbox intersects with any table_bbox, reject it.
+* **Purpose:** Heuristic filter for identifying likely heading texts.
+* **Checks:**
 
-python
-Copy
-Edit
-for table_bbox in table_bboxes:
-    if intersects(span_bbox, table_bbox):
-        return True
-### score_heading_candidate(text, span)
-Purpose:
-Score a candidate text span based on features that indicate it might be a heading.
+  * Length (> 3 and < 120)
+  * Does not start with "Figure", "Table", "Fig."
+  * No more than one period (.)
+  * Avoids numerical-only lines or codes
+  * Excludes typical footers or boilerplate (e.g., "Copyright")
 
-Heuristic Features:
+---
 
-Text is title-cased or uppercase.
+### `get_dominant_font_sizes(doc)`
 
-Ends without punctuation.
+* **Purpose:** Returns most common font sizes across pages to define H1, H2, H3 hierarchy.
+* **Logic:**
 
-Is center-aligned.
+  * Counts frequency of each font size
+  * Picks top 3 largest sizes as `H1`, `H2`, `H3` based on order
 
-Span is bold.
+---
 
-Font size is larger than paragraph average.
+### `overlaps_table(x0, y0, x1, y1, tables)`
 
-Returns a score, and only spans above a threshold are retained as headings.
+* **Purpose:** Checks if a text block is inside any table using its bounding box.
+* **Input:** Span coordinates `(x0, y0, x1, y1)`
+* **Logic:** Compares span with every table's bbox to detect overlap
 
-### extract_headings_from_page(page, heading_levels, table_bboxes)
-Purpose:
-From one page, extract all text spans that:
+---
 
-Are not inside tables.
+### `classify_heading(font_size, font_map)`
 
-Are not invalid.
+* **Purpose:** Maps font size to heading level
+* **Returns:** `"H1"`, `"H2"`, `"H3"` or `None`
 
-Belong to one of the heading levels (by font size).
+---
 
-Returns:
+### `normalize_text(text)`
 
-A list of heading objects:
+* **Purpose:** Strips whitespace and replaces multiple spaces
+* **Usage:** Cleans raw span text before evaluation
 
-json
-Copy
-Edit
-{ "level": "H1", "page": 3, "text": "Chapter 1: Introduction" }
-### parse_pdf_for_headings(filepath)
-Purpose:
-The main function that processes the entire PDF.
+---
 
-Steps:
+### `extract_font_size_map(counter)`
 
-Open with fitz and pdfplumber.
+* **Purpose:** Builds a font size → heading level mapping (H1 > H2 > H3)
+* **Example:**
 
-Extract font statistics → Detect heading levels.
+  ```python
+  {
+    20.0: "H1",
+    17.0: "H2",
+    14.0: "H3"
+  }
+  ```
 
-For each page:
+---
 
-Get table areas.
+### `filter_and_score_heading(span)`
 
-Use layout info from fitz.
+* **Future Work (Optional):** Assigns score to each span using more advanced logic (NLP, casing, punctuation balance)
 
-Filter invalid or table-contained spans.
+---
 
-Score candidates.
+## 🧪 Example Output
 
-Save structured headings to JSON.
-
-📥 Output Format
-The extracted headings are returned as structured JSON:
-
-json
-Copy
-Edit
+```json
 [
   {
     "level": "H1",
@@ -170,24 +152,54 @@ Edit
   {
     "level": "H2",
     "page": 2,
-    "text": "1.1 Purpose of the Document"
+    "text": "1.1 Background and Purpose"
   }
 ]
-This format is ideal for:
+```
 
-TOC generation
+---
 
-Chunk-based summarization
+## 📚 Dependencies
 
-RAG pipelines with heading context
+* `PyMuPDF (fitz)`
+* `pdfplumber`
+* `spacy` *(optional for NLP-based scoring)*
+* `re`, `collections`, `os`, `json`
 
-🧠 Heuristics Recap
-Feature	Description
-Font Size	Larger than average = likely heading
-Boldness	Bold = higher chance of heading
-Text Length	Not too short or too long
-Capitalization	Title-case or ALL CAPS preferred
-Table Check	Skip if inside detected table
-Punctuation	No end punctuation like ., : etc.
-Alignment	Centered or left-aligned
+---
 
+## 📌 Best Practices
+
+* Prefer PDFs with clear formatting and embedded fonts.
+* Exclude scanned PDFs or image-based PDFs (OCR not supported yet).
+* Run on multiple PDFs to auto-adjust font size hierarchy per document.
+
+---
+
+## 💡 Future Improvements
+
+* [ ] Add markdown output with heading levels
+* [ ] Add visual overlay for headings in extracted PDF
+* [ ] Integrate OCR for scanned documents
+* [ ] Train transformer-based classifier for better heading detection
+
+---
+
+## 👤 Author
+
+**Chitwan Gupta**
+📧 \[[email@example.com](mailto:email@example.com)]
+🌐 [github.com/your-username](https://github.com/your-username)
+
+---
+
+## 📝 License
+
+MIT License. See `LICENSE` file for details.
+
+```
+
+---
+
+Let me know if you'd like the `main.py`, `Dockerfile`, or `requirements.txt` file to go with this.
+```
